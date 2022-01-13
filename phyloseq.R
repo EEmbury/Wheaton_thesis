@@ -1,5 +1,6 @@
 # https://joey711.github.io/phyloseq/import-data.html#_microbio_me_qiime_(defunct)
 
+# load packages 
 library(phyloseq)
 library(ggplot2)
 library(vegan)
