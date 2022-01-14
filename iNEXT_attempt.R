@@ -1,4 +1,4 @@
-
+rm(list = ls())
 ###### iNEXT attempt ######
 #install.packages("iNEXT")
 
@@ -14,6 +14,46 @@ coverage <- iNEXT(otu_data, q = 0, datatype = "abundance")
 
 #calculate estimate d
 estimate_d <- estimateD(otu_data, datatype = "abundance", base = "coverage")
+
+
+###### rarefy #######
+
+estimate_d_values <- read.csv("estimate_d.csv", header = TRUE)
+
+t_otu <- t(otu_data)
+
+##cl20r -- 307
+
+cl20r <- otu_data[c("CL20r")]
+typeof(cl20r)
+final_cl20r <- as.data.frame(t(cl20r))
+typeof(final_cl20r)
+CL20r_rare <- rrarefy(final_cl20r, sample = 307)
+
+# for loop
+
+vectooor <- c(1)
+for (val in 2:314){
+  vectooor <- append(vectooor,val)
+}
+
+for (q in 1:314) {
+  table_val <- estimate_d_values[q,1]
+  otu <- otu_data[, table_val]
+  typeof(table_val)
+  t_val <- as.data.frame(t(otu))
+  typeof(estimate_d_values[q, 2])
+  rare <- rrarefy(t_val, sample = (estimate_d_values[q, 2]))
+  t_rare <- t(rare)
+  fart <- as.data.frame(t_rare)
+  #write.csv(fart, "rare_otu.csv", append = TRUE, col.names = table_val, row.names = otu_data$OUT.ID)
+  #vectooor <- append(vectooor, fart)
+  vectooor[q] <- fart
+  }
+
+vectar <- as.data.frame(vectooor)
+
+write.csv(vectar, "test.csv")
 
 ##### phyloseq ######
 
@@ -60,3 +100,5 @@ SAM
 table <- phyloseq(OTU, TAX)
 
 physeq1 <- merge_phyloseq(table, SAM)
+
+
