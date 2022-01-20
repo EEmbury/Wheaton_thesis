@@ -1,0 +1,181 @@
+##### phyloseq ######
+
+library(phyloseq)
+
+#read data
+otudata <- read.csv("otu_rm_singletons_rm_<1000.csv", header = TRUE)
+otutax <- read.csv("taxa_divided_rm_singletons_rm_1000.csv")
+samdata <- read.csv("Finalized_Metadata.csv")
+
+
+#change row labels
+#install.packages("tidyverse")
+library(tidyverse)
+
+otudata$X <- sub(otudata$X, 
+                  pattern = "OTU", replacement = "")
+
+otu_data <- otudata %>% remove_rownames %>% column_to_rownames(var="X")
+
+
+otutax$OTU_ID <- sub(otutax$OTU_ID, 
+                     pattern = "OTU", replacement = "")
+
+otu_taxa <- otutax %>% remove_rownames %>% column_to_rownames(var="OTU_ID")
+
+rownames(samdata) <-samdata$Label
+
+#coerce matrix (taxa needs to be in a matrix format)
+
+test <- as.matrix(otu_taxa, rownames.force = NA)
+
+# setting data to phyloseq format
+
+library(phyloseq)
+OTU <- otu_table(otu_data, taxa_are_rows = TRUE)
+TAX <-  tax_table(test)
+SAM <- sample_data(samdata)
+OTU
+TAX
+SAM
+
+# combine physeq tables into 1 unit
+table <- phyloseq(OTU, TAX)
+
+physeq1 <- merge_phyloseq(table, SAM)
+
+
+
+##### alpha visualization #####
+alpha_meas = c("Shannon")
+
+p <- plot_richness(physeq1, x="Grouped", measures=alpha_meas, color = "Grouped")+
+  labs(title = "Alpha Diversity Measurment by Treatment" , caption = "")
+
+p
+
+p + geom_boxplot(data = p$data, aes(x=Grouped, y=value, color = NULL), alpha=0.05) +
+  xlab("Treatment") +
+  scale_x_discrete("Treatment", labels = c("control" = "Control\n \n" ,"eradicated" = "Eradicated\np = 0.158\n", "invaded" = "Invaded\np = 0.742\n","nitrogen" = "Nitrogen\np = 0.406\n","warm" = "Warm\np = 0.996\n"))+
+  theme(panel.grid = element_blank(),
+        legend.position = "none",
+        panel.background = element_rect(fill = "white"),
+        panel.border = element_rect(color = "black", fill = NA, size = 0.5),
+        plot.title = element_text(hjust = 0.5),
+        plot.caption = element_text(hjust = 0),
+        axis.text.x = element_text(angle = 0, vjust = 0.5, hjust=0.5, size = 10), 
+        axis.title.x = element_text(color="black", vjust=1),
+        axis.title.y = element_text(color="black" , vjust=1))+
+  theme(strip.background = element_rect(colour="black", fill="white",
+                                        size=0.5, linetype="solid"))
+
+
+
+
+##### alpha ANOVA ####
+library(vegan)
+
+
+otu_t <- t(otu_data)
+
+write.csv(alphaotu, "alpha_otu.csv")
+
+t_otu <- read.csv("transpose_otu.csv", header = TRUE)
+
+t_otu$X <- sub(t_otu$X, 
+                 pattern = "OTU", replacement = "")
+
+t_otu <- t_otu %>% remove_rownames %>% column_to_rownames(var="X")
+
+
+t_otu$Alpha <- diversity(t_otu,
+                            MARGIN = 1,
+                            index = "shannon")
+alpha_otu <- t(t_otu)
+
+alphaotu <- as.data.frame(alpha_otu)
+
+otu_year_group <- read.csv("Finalized_Metadata.csv")
+
+
+#Analysis of Variance of shannon alpha diversity compared to variables
+mixed_alpha <- aov(Alpha ~ Grouped, data = otu_year_group)
+summary(mixed_alpha)
+
+#Tukey Honest Significant Differences -- confidence intervals between differences of the means of factors
+TukeyHSD(mixed_alpha)
+
+write.csv(otuall.t, "otu_alpha_2.csv", row.names =TRUE)
+
+#adjusted p-vlaues w/ phyloseq
+#warm-control 0.9955429
+#invaded-control 0.7424470
+#nitrogen-control 0.4056320 
+#eradicated-control 0.1578449
+
+
+#### Chao Shannon ####
+library(iNEXT)
+
+ChaoShannon <- ChaoShannon(otu_data, datatype = "abundance")
+write.csv(ChaoShannon, "ChaoShannon.csv")
+
+shannon <- read.csv("ChaoShannon.csv", header = TRUE)
+
+#Analysis of Variance of shannon alpha diversity compared to variables
+Chao <- aov(Observed ~ Grouped, data = shannon)
+summary(Chao)
+
+#Tukey Honest Significant Differences -- confidence intervals between differences of the means of factors
+TukeyHSD(Chao)
+
+# p adj of observed 
+# eradicated-control 0.1291778
+# invaded-control  0.8187085
+# nitrogen-control  0.4776123
+# warm-control  0.9993261
+
+
+# p adj of estimate 
+# eradicated-control 0.1637234
+# invaded-control 0.8413963
+# nitrogen-control 0.4983061
+# warm-control 0.9973898
+
+#adjusted p-vlaues w/ phyloseq
+#eradicated-control 0.1578449
+#invaded-control 0.7424470
+#nitrogen-control 0.4056320 
+#warm-control 0.9955429
+
+
+
+#### ANOVA #####
+#http://deneflab.github.io/MicrobeMiseq/demos/mothur_2_phyloseq.html#permanova
+
+bray.1 <- phyloseq::distance(alldata.1, method = "bray")
+bray.3 <- phyloseq::distance(alldata.3, method = "bray")
+bray.4 <- phyloseq::distance(alldata.4, method = "bray")
+
+
+sampledf.1 <- data.frame(sample_data(alldata.1))
+sampledf.3 <- data.frame(sample_data(alldata.3))
+sampledf.4 <- data.frame(sample_data(alldata.4))
+
+
+beta.simple <- betadisper(bray.1, sampledf.1$simple)
+simple.anova <- permutest(beta.simple)
+
+beta.year <- betadisper(bray.3, sampledf.3$Year)
+year.anova <- permutest(beta.year, pairwise = TRUE)
+
+year.anova
+
+beta.veg <- betadisper(bray.3, sampledf.3$Vegetation)
+veg.anova <- permutest(beta.veg)
+
+beta.site <- betadisper(bray.3, sampledf.3$Site)
+site.anova <- permutest(beta.site)
+
+beta.group <- betadisper(bray.4, sampledf.4$Grouped)
+group.anova <- permutest(beta.group, pairwise = TRUE)
