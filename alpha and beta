@@ -3,7 +3,7 @@
 library(phyloseq)
 
 #read data
-otudata <- read.csv("otu_rm_singletons_rm_<1000.csv", header = TRUE)
+otudata <- read.csv("RARE_otu_rm_singletons_rm_<1000.csv", header = TRUE)
 otutax <- read.csv("taxa_divided_rm_singletons_rm_1000.csv")
 samdata <- read.csv("Finalized_Metadata.csv")
 
@@ -23,7 +23,9 @@ otutax$OTU_ID <- sub(otutax$OTU_ID,
 
 otu_taxa <- otutax %>% remove_rownames %>% column_to_rownames(var="OTU_ID")
 
-rownames(samdata) <-samdata$Label
+#rownames(samdata) <-samdata$Label
+
+sam_data<- samdata %>% remove_rownames %>% column_to_rownames(var="Label")
 
 #coerce matrix (taxa needs to be in a matrix format)
 
@@ -34,7 +36,7 @@ test <- as.matrix(otu_taxa, rownames.force = NA)
 library(phyloseq)
 OTU <- otu_table(otu_data, taxa_are_rows = TRUE)
 TAX <-  tax_table(test)
-SAM <- sample_data(samdata)
+SAM <- sample_data(sam_data)
 OTU
 TAX
 SAM
@@ -73,6 +75,15 @@ p + geom_boxplot(data = p$data, aes(x=Grouped, y=value, color = NULL), alpha=0.0
 
 
 ##### alpha ANOVA ####
+
+#https://rpubs.com/lconteville/713954
+richness <- estimate_richness(physeq1)
+anova.sh = aov(richness$Shannon ~ sample_data(physeq1)$Group)
+summary(anova.sh)
+
+TukeyHSD(anova.sh)
+
+
 library(vegan)
 
 
