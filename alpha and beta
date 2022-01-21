@@ -58,7 +58,7 @@ p
 
 p + geom_boxplot(data = p$data, aes(x=Grouped, y=value, color = NULL), alpha=0.05) +
   xlab("Treatment") +
-  scale_x_discrete("Treatment", labels = c("control" = "Control\n \n" ,"eradicated" = "Eradicated\np = 0.158\n", "invaded" = "Invaded\np = 0.742\n","nitrogen" = "Nitrogen\np = 0.406\n","warm" = "Warm\np = 0.996\n"))+
+  scale_x_discrete("Treatment", labels = c("control" = "Control\n \n" ,"eradicated" = "Eradicated\np = 0.193\n", "invaded" = "Invaded\np = 0.717\n","nitrogen" = "Nitrogen\np = 0.431\n","warm" = "Warm\np =  0.986\n"))+
   theme(panel.grid = element_blank(),
         legend.position = "none",
         panel.background = element_rect(fill = "white"),
@@ -78,45 +78,49 @@ p + geom_boxplot(data = p$data, aes(x=Grouped, y=value, color = NULL), alpha=0.0
 
 #https://rpubs.com/lconteville/713954
 richness <- estimate_richness(physeq1)
+
+# #Analysis of Variance of shannon alpha diversity compared to variables
 anova.sh = aov(richness$Shannon ~ sample_data(physeq1)$Group)
 summary(anova.sh)
+
+#Tukey Honest Significant Differences -- confidence intervals between differences of the means of factors
 
 TukeyHSD(anova.sh)
 
 
-library(vegan)
-
-
-otu_t <- t(otu_data)
-
-write.csv(alphaotu, "alpha_otu.csv")
-
-t_otu <- read.csv("transpose_otu.csv", header = TRUE)
-
-t_otu$X <- sub(t_otu$X, 
-                 pattern = "OTU", replacement = "")
-
-t_otu <- t_otu %>% remove_rownames %>% column_to_rownames(var="X")
-
-
-t_otu$Alpha <- diversity(t_otu,
-                            MARGIN = 1,
-                            index = "shannon")
-alpha_otu <- t(t_otu)
-
-alphaotu <- as.data.frame(alpha_otu)
-
-otu_year_group <- read.csv("Finalized_Metadata.csv")
-
-
-#Analysis of Variance of shannon alpha diversity compared to variables
-mixed_alpha <- aov(Alpha ~ Grouped, data = otu_year_group)
-summary(mixed_alpha)
-
-#Tukey Honest Significant Differences -- confidence intervals between differences of the means of factors
-TukeyHSD(mixed_alpha)
-
-write.csv(otuall.t, "otu_alpha_2.csv", row.names =TRUE)
+# library(vegan)
+# 
+# 
+# otu_t <- t(otu_data)
+# 
+# write.csv(alphaotu, "alpha_otu.csv")
+# 
+# t_otu <- read.csv("transpose_otu.csv", header = TRUE)
+# 
+# t_otu$X <- sub(t_otu$X, 
+#                  pattern = "OTU", replacement = "")
+# 
+# t_otu <- t_otu %>% remove_rownames %>% column_to_rownames(var="X")
+# 
+# 
+# t_otu$Alpha <- diversity(t_otu,
+#                             MARGIN = 1,
+#                             index = "shannon")
+# alpha_otu <- t(t_otu)
+# 
+# alphaotu <- as.data.frame(alpha_otu)
+# 
+# otu_year_group <- read.csv("Finalized_Metadata.csv")
+# 
+# 
+# #Analysis of Variance of shannon alpha diversity compared to variables
+# mixed_alpha <- aov(Alpha ~ Grouped, data = otu_year_group)
+# summary(mixed_alpha)
+# 
+# #Tukey Honest Significant Differences -- confidence intervals between differences of the means of factors
+# TukeyHSD(mixed_alpha)
+# 
+# write.csv(otuall.t, "otu_alpha_2.csv", row.names =TRUE)
 
 #adjusted p-vlaues w/ phyloseq
 #warm-control 0.9955429
@@ -161,32 +165,62 @@ TukeyHSD(Chao)
 
 
 
-#### ANOVA #####
-#http://deneflab.github.io/MicrobeMiseq/demos/mothur_2_phyloseq.html#permanova
+##### beta visualization ####
 
-bray.1 <- phyloseq::distance(alldata.1, method = "bray")
-bray.3 <- phyloseq::distance(alldata.3, method = "bray")
-bray.4 <- phyloseq::distance(alldata.4, method = "bray")
-
-
-sampledf.1 <- data.frame(sample_data(alldata.1))
-sampledf.3 <- data.frame(sample_data(alldata.3))
-sampledf.4 <- data.frame(sample_data(alldata.4))
+install.packages("betapart")
+library(betapart)
+library(vegan)
+library(data.table)
+library(dplyr)
+library(tidyverse)
 
 
-beta.simple <- betadisper(bray.1, sampledf.1$simple)
-simple.anova <- permutest(beta.simple)
 
-beta.year <- betadisper(bray.3, sampledf.3$Year)
-year.anova <- permutest(beta.year, pairwise = TRUE)
+########################################################################
 
-year.anova
+t_otu <- t(otu_data)
 
-beta.veg <- betadisper(bray.3, sampledf.3$Vegetation)
-veg.anova <- permutest(beta.veg)
+t_otu <- as.data.frame(t_otu)
 
-beta.site <- betadisper(bray.3, sampledf.3$Site)
-site.anova <- permutest(beta.site)
+beta.data <- bray.part(t_otu)
 
-beta.group <- betadisper(bray.4, sampledf.4$Grouped)
-group.anova <- permutest(beta.group, pairwise = TRUE)
+
+mds<- metaMDS(beta.data$bray)
+
+mds_data <- as.data.frame(mds$points)
+
+#write.csv(mds_data_2017, "2017_beta.csv")
+
+
+
+
+samdata <- read.csv("DOD2017_metadata.csv")
+# stress = 0.2746165 
+
+
+mds_data$SampleID <- rownames(mds_data)
+sam_data$SampleID <- rownames(sam_data)
+mds_data <- dplyr::left_join(mds_data, sam_data)
+
+
+cbbPalette <- c("#009E73", "#e79f00", "#0072B2", "#D55E00", "#CC79A7", "#9999CC")
+
+library(ggplot2)
+p <- ggplot(mds_data, aes(x = MDS1, y = MDS2, color = Grouped)) +
+  geom_point(size= 3)+
+  stat_ellipse(size =.5) +
+  theme(panel.grid = element_blank(),
+        panel.background = element_rect(fill = "white"),
+        panel.border = element_rect(color = "black", fill = NA, size = 0.5),
+        plot.title = element_text(hjust = 0.5),
+        plot.caption = element_text(hjust = 0),
+        axis.title.x = element_text(color="black", vjust=1),
+        axis.title.y = element_text(color="black" , vjust=1))+
+  #scale_color_manual(values = cbbPalette) +
+  theme(strip.background = element_rect(colour="black", fill="white",
+                                        size=0.5, linetype="solid"))
+
+
+
+p + labs(title = "",
+              caption = "Stress = ; P-value = ")
