@@ -3,8 +3,8 @@
 library(phyloseq)
 
 #read data
-otudata <- read.csv("RARE_otu_rm_singletons_rm_<1000.csv", header = TRUE)
-otutax <- read.csv("taxa_divided_rm_singletons_rm_1000.csv")
+otudata <- read.csv("RARE_otu_cleaned.csv", header = TRUE)
+otutax <- read.csv("taxa_divided_cleaned.csv")
 samdata <- read.csv("Finalized_Metadata.csv")
 
 
@@ -12,10 +12,10 @@ samdata <- read.csv("Finalized_Metadata.csv")
 #install.packages("tidyverse")
 library(tidyverse)
 
-otudata$X <- sub(otudata$X, 
+otudata$OTU_ID <- sub(otudata$OTU_ID, 
                   pattern = "OTU", replacement = "")
 
-otu_data <- otudata %>% remove_rownames %>% column_to_rownames(var="X")
+otu_data <- otudata %>% remove_rownames %>% column_to_rownames(var="OTU_ID")
 
 
 otutax$OTU_ID <- sub(otutax$OTU_ID, 
@@ -58,7 +58,7 @@ p
 
 p + geom_boxplot(data = p$data, aes(x=Grouped, y=value, color = NULL), alpha=0.05) +
   xlab("Treatment") +
-  scale_x_discrete("Treatment", labels = c("control" = "Control\n \n" ,"eradicated" = "Eradicated\np = 0.193\n", "invaded" = "Invaded\np = 0.717\n","nitrogen" = "Nitrogen\np = 0.431\n","warm" = "Warm\np =  0.986\n"))+
+  scale_x_discrete("Treatment", labels = c("control" = "Control\n \n" ,"eradicated" = "Eradicated\np = 0.262\n", "invaded" = "Invaded\np = 0.810\n","nitrogen" = "Nitrogen\np = 0.200\n","warm" = "Warm\np =  0.981\n"))+
   theme(panel.grid = element_blank(),
         legend.position = "none",
         panel.background = element_rect(fill = "white"),
@@ -167,16 +167,13 @@ TukeyHSD(Chao)
 
 ##### beta visualization ####
 
-install.packages("betapart")
+#install.packages("betapart")
 library(betapart)
 library(vegan)
 library(data.table)
 library(dplyr)
 library(tidyverse)
 
-
-
-########################################################################
 
 t_otu <- t(otu_data)
 
@@ -189,13 +186,12 @@ mds<- metaMDS(beta.data$bray)
 
 mds_data <- as.data.frame(mds$points)
 
+anova.sh = aov(mds ~ mds_data$Grouped)
+
 #write.csv(mds_data_2017, "2017_beta.csv")
 
 
-
-
-samdata <- read.csv("DOD2017_metadata.csv")
-# stress = 0.2746165 
+# stress = 0.1472309
 
 
 mds_data$SampleID <- rownames(mds_data)
@@ -223,4 +219,62 @@ p <- ggplot(mds_data, aes(x = MDS1, y = MDS2, color = Grouped)) +
 
 
 p + labs(title = "",
-              caption = "Stress = ; P-value = ")
+              caption = "Stress = 0.1472309; P-value = 6.49e-16")
+
+
+##### permanova #####
+#install.packages("PERMANOVA")
+
+library(PERMANOVA)
+
+t_otu$SampleID <- rownames(t_otu)
+sam_data$SampleID <- rownames(sam_data)
+group_data <- dplyr::left_join(t_otu, sam_data)
+
+
+groups <- factor(group_data$Grouped)
+groups
+
+bray <- DistContinuous(t_otu, coef="Bray_Curtis")
+
+permanova <- PERMANOVA(bray, groups, CoordPrinc = TRUE)
+
+plot(permanova)
+
+summary(permanova)
+
+
+##### betadisper #####
+#https://cran.r-project.org/web/packages/hagis/vignettes/betadiversity.html
+
+t_otu$SampleID <- rownames(t_otu)
+sam_data$SampleID <- rownames(sam_data)
+group_data <- dplyr::left_join(t_otu, sam_data)
+
+
+groups <- factor(group_data$Grouped)
+groups
+dis <- vegdist(t_otu, "bray", na.rm = TRUE)
+
+beta_dis <- betadisper(dis, group_data$Grouped)
+
+beta_dis_anova <- anova(beta_dis) 
+beta_dis_anova
+
+beta_dis_TukeyHSD <- TukeyHSD(beta_dis)
+beta_dis_TukeyHSD
+
+boxplot(beta_dis,ellipse = TRUE)
+
+
+
+
+###### taxa visualization ######
+
+#https://rstudio-pubs-static.s3.amazonaws.com/403427_6537014d60e44e1b9d72514d5fb787b5.html
+
+# https://www.nicholas-ollberding.com/post/introduction-to-the-statistical-analysis-of-microbiome-data-in-r/
+
+plot_bar(physeq1, x="Grouped", fill="family") + theme(legend.position = "none")
+
+plot_bar(physeq1, "Grouped", fill="order") + geom_bar(stat="identity") + theme(legend.position = "none")
