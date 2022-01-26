@@ -1,0 +1,48 @@
+rm(list = ls())
+
+# source code: https://natpombubpa-lab.github.io/resources/FunGuild_plot
+
+
+#Code for Rscript
+#Load R libraries
+library(ape)
+library(vegan)
+library(dplyr)
+library(phyloseq)
+library(ggplot2)
+library(tidyverse)
+
+#Load mapping file into R
+meta <- read.csv("Finalized_Metadata.csv", header=TRUE)
+sampleData <- sample_data(meta)
+
+sampleData <- sampleData %>% remove_rownames %>% column_to_rownames(var="Label")
+
+#Load reformatted FUNGuild data into R
+FG <- read.csv("funguild_cleaned.CSV",header=T)
+
+FG$OTU.ID <- sub(FG$OTU.ID, 
+                      pattern = "OTU", replacement = "")
+
+FG <- FG %>% remove_rownames %>% column_to_rownames(var="OTU.ID")
+
+#Select only the column that we need
+FGotus <- select(FG, -(taxonomy:Citation.Source))
+FGotumat <- as(as.matrix(FGotus), "matrix")
+FGOTU <- otu_table(FGotumat, taxa_are_rows = TRUE)
+FGtaxmat <- select(FG, Confidence.Ranking, Trophic.Mode, Guild, Growth.Morphology)
+FGtaxmat <- as(as.matrix(FGtaxmat),"matrix")
+FGTAX = tax_table(FGtaxmat)
+
+#Creating phyloseq object
+physeq = phyloseq(FGOTU,FGTAX,sampleData)
+physeq.prune = prune_taxa(taxa_sums(physeq) > 1, physeq)
+physeq.prune.nopossible = subset_taxa(physeq.prune, Confidence.Ranking="Highly Possible")
+physeq.prune.nopossible = subset_taxa(physeq.prune.nopossible, Confidence.Ranking!="-")
+
+#Create color palette
+cbbPalette <- c("#009E73","#999999", "#E69F00", "#56B4E9", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "midnightblue", "lightgreen","saddlebrown", "brown", "aquamarine4","lavenderblush2","snow3", "darkblue", "darkgoldenrod1", "darkseagreen", "darkorchid", "darkolivegreen1", "black","lightskyblue", "darkgreen", "deeppink", "khaki2", "firebrick", "brown1", "darkorange1", "cyan1", "royalblue4", "darksalmon", "darkblue","royalblue4", "dodgerblue3", "steelblue1", "lightskyblue", "darkseagreen", "darkgoldenrod1", "darkseagreen", "darkorchid", "darkolivegreen1", "brown1", "darkorange1", "cyan1", "darkgrey")
+
+#Create a plot
+FUNGuildcom = ggplot(data = psmelt(physeq.prune.nopossible), mapping = aes_string(x = "Grouped" ,y = "Abundance", fill = "Trophic.Mode" )) + geom_bar(stat="identity", position="fill") + ggtitle("Fungal Trophic Mode Composition ")+theme(axis.text.x = element_text(angle = 90, hjust = 1)) + scale_fill_manual(values = cbbPalette)
+FUNGuildcom
