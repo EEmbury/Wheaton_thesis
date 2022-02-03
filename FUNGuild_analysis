@@ -11,6 +11,9 @@ library(dplyr)
 library(phyloseq)
 library(ggplot2)
 library(tidyverse)
+library(ggsignif)
+library(ggpubr)
+
 
 #Load mapping file into R
 meta <- read.csv("Finalized_Metadata.csv", header=TRUE)
@@ -19,7 +22,7 @@ sampleData <- sample_data(meta)
 sampleData <- sampleData %>% remove_rownames %>% column_to_rownames(var="Label")
 
 #Load reformatted FUNGuild data into R
-FG <- read.csv("funguild_cleaned.CSV",header=T)
+FG <- read.csv("funguild_cleaned_test.CSV",header=T)
 
 FG$OTU.ID <- sub(FG$OTU.ID, 
                       pattern = "OTU", replacement = "")
@@ -30,7 +33,7 @@ FG <- FG %>% remove_rownames %>% column_to_rownames(var="OTU.ID")
 FGotus <- select(FG, -(taxonomy:Citation.Source))
 FGotumat <- as(as.matrix(FGotus), "matrix")
 FGOTU <- otu_table(FGotumat, taxa_are_rows = TRUE)
-FGtaxmat <- select(FG, Confidence.Ranking, Trophic.Mode, Guild, Growth.Morphology)
+FGtaxmat <- select(FG, Confidence.Ranking, Trophic.Mode, class, order, family)
 FGtaxmat <- as(as.matrix(FGtaxmat),"matrix")
 FGTAX = tax_table(FGtaxmat)
 
@@ -39,10 +42,85 @@ physeq = phyloseq(FGOTU,FGTAX,sampleData)
 physeq.prune = prune_taxa(taxa_sums(physeq) > 1, physeq)
 physeq.prune.nopossible = subset_taxa(physeq.prune, Confidence.Ranking="Highly Possible")
 physeq.prune.nopossible = subset_taxa(physeq.prune.nopossible, Confidence.Ranking!="-")
+rel_abund = physeq.prune.nopossible %>%  transform_sample_counts(function(x) {x/sum(x)}) %>% psmelt()
 
 #Create color palette
-cbbPalette <- c("#009E73","#999999", "#E69F00", "#56B4E9", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "midnightblue", "lightgreen","saddlebrown", "brown", "aquamarine4","lavenderblush2","snow3", "darkblue", "darkgoldenrod1", "darkseagreen", "darkorchid", "darkolivegreen1", "black","lightskyblue", "darkgreen", "deeppink", "khaki2", "firebrick", "brown1", "darkorange1", "cyan1", "royalblue4", "darksalmon", "darkblue","royalblue4", "dodgerblue3", "steelblue1", "lightskyblue", "darkseagreen", "darkgoldenrod1", "darkseagreen", "darkorchid", "darkolivegreen1", "brown1", "darkorange1", "cyan1", "darkgrey")
 
-#Create a plot
-FUNGuildcom = ggplot(data = psmelt(physeq.prune.nopossible), mapping = aes_string(x = "Grouped" ,y = "Abundance", fill = "Trophic.Mode" )) + geom_bar(stat="identity", position="fill") + ggtitle("Fungal Trophic Mode Composition ")+theme(axis.text.x = element_text(angle = 90, hjust = 1)) + scale_fill_manual(values = cbbPalette)
-FUNGuildcom
+#install.packages("randomcoloR")
+library(randomcoloR)
+n <- 19
+palette <- distinctColorPalette(n)
+
+
+cbbPalette <-  grDevices::colors()[grep('gr(a|e)y', grDevices::colors(), invert = T)]
+
+library(RColorBrewer)
+brewer.pal(12, "Set3")
+
+
+
+
+#psF = filter_taxa(physeq.prune.nopossible, function(x) sum(x>2) > (0.15*length(x)), TRUE)
+
+
+#rel.abund = transform_sample_counts(physeq.prune.nopossible, (function(x) x/sum(x)))
+
+#psmelt = psmelt(rel.abund)
+
+psmelt2 = psmelt(physeq.prune.nopossible)
+
+
+############# saprotroph ###
+FUNGuildcom = ggplot(data = rel_abund, mapping = aes_string(x = "Grouped",  y = "Abundance", fill = "Trophic.Mode"))+
+              geom_bar(stat="identity", position = "dodge", width = 0.5) + ggtitle("Trophic Mode Relative Abundance")+
+              theme(axis.text.x = element_text(angle = 90))
+              
+  
+  stat_compare_means(method = "kruskal.test",
+                                  label.y =1)
+
+theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  stat_compare_means(label = "p.signif", method = "wilcox.test",
+                     ref.group = "control")
+              #+ scale_fill_manual(values = palette)
+
+FUNGuildcom 
+
+label.y = c(420010, 450000, 150000, 53000, 35000, 10100)
+
+############ pathotroph ###
+
+FUNGuildcom = ggplot(data = psmelt2, mapping = aes_string(x = "Grouped",  y = "Abundance"))+
+  geom_bar(stat="identity") + ggtitle("Pathotroph Relative Abundance")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  stat_compare_means(label = "p.signif", method = "wilcox.test",
+                     ref.group = "control", label.y = c(420010, 450000, 150000, 60000, 35000, 10100))+ 
+  stat_compare_means(method = "kruskal.test",
+                     label.y = 480000)
+#+ scale_fill_manual(values = palette)
+
+FUNGuildcom 
+
+#################### Symbiotroh ###
+FUNGuildcom = ggplot(data = psmelt2, mapping = aes_string(x = "Grouped",  y = "Abundance"))+
+  geom_bar(stat="identity") + ggtitle("Symbiotroph Relative Abundance")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  stat_compare_means(label = "p.signif", method = "wilcox.test",
+                     ref.group = "control", label.y = c(1000010, 800000, 270000, 37000, 65000, 10100))+ 
+  stat_compare_means(method = "kruskal.test",
+                     label.y = 1060000)
+#+ scale_fill_manual(values = palette)
+
+FUNGuildcom 
+
+
+#### ANOVA #####
+aov <- aov(Abundance ~ Grouped , data = psmelt)
+summary(aov)
+
+TukeyHSD <- TukeyHSD(aov)
+TukeyHSD
+
+write.csv(TukeyHSD$`Grouped:order`, "Tukey.csv")
+
+options(max.print=100000)
