@@ -1,11 +1,12 @@
+rm(list = ls())
 ##### phyloseq ######
 
 library(phyloseq)
 
 #read data
-otudata <- read.csv("RARE_otu_cleaned.csv", header = TRUE)
-otutax <- read.csv("taxa_divided_cleaned.csv")
-samdata <- read.csv("Finalized_Metadata.csv")
+otudata <- read.csv("normal_otu.csv", header = TRUE)
+otutax <- read.csv("taxa_divided.csv")
+samdata <- read.csv("MetaData.csv")
 
 
 #change row labels
@@ -25,7 +26,7 @@ otu_taxa <- otutax %>% remove_rownames %>% column_to_rownames(var="OTU_ID")
 
 #rownames(samdata) <-samdata$Label
 
-sam_data<- samdata %>% remove_rownames %>% column_to_rownames(var="Label")
+sam_data<- samdata %>% remove_rownames %>% column_to_rownames(var="Site")
 
 #coerce matrix (taxa needs to be in a matrix format)
 
@@ -37,9 +38,7 @@ library(phyloseq)
 OTU <- otu_table(otu_data, taxa_are_rows = TRUE)
 TAX <-  tax_table(test)
 SAM <- sample_data(sam_data)
-OTU
-TAX
-SAM
+
 
 # combine physeq tables into 1 unit
 table <- phyloseq(OTU, TAX)
@@ -47,32 +46,32 @@ table <- phyloseq(OTU, TAX)
 physeq1 <- merge_phyloseq(table, SAM)
 
 
-
 ##### alpha visualization #####
 alpha_meas = c("Shannon")
 
-p <- plot_richness(physeq1, x="Grouped", measures=alpha_meas, color = "Grouped")+
+p <- plot_richness(physeq1, x="Treatment.Divided", measures=alpha_meas, color = "Treatment.Divided")+
   labs(title = "Alpha Diversity Measurment by Treatment" , caption = "")
 
 p
 
-p + geom_boxplot(data = p$data, aes(x=Grouped, y=value, color = NULL), alpha=0.05) +
+p + geom_boxplot(data = p$data, aes(x=Treatment.Divided, y=value, color = NULL), alpha=0.05) +scale_x_discrete(limits = labels) +
   xlab("Treatment") +
-  scale_x_discrete("Treatment", labels = c("control" = "Control\n \n" ,"eradicated" = "Eradicated\np = 0.262\n", "invaded" = "Invaded\np = 0.810\n","nitrogen" = "Nitrogen\np = 0.200\n","warm" = "Warm\np =  0.981\n"))+
   theme(panel.grid = element_blank(),
         legend.position = "none",
         panel.background = element_rect(fill = "white"),
         panel.border = element_rect(color = "black", fill = NA, size = 0.5),
         plot.title = element_text(hjust = 0.5),
         plot.caption = element_text(hjust = 0),
-        axis.text.x = element_text(angle = 0, vjust = 0.5, hjust=0.5, size = 10), 
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=0.5, size = 10), 
         axis.title.x = element_text(color="black", vjust=1),
         axis.title.y = element_text(color="black" , vjust=1))+
   theme(strip.background = element_rect(colour="black", fill="white",
                                         size=0.5, linetype="solid"))
+ 
 
-
-
+# change position in figure
+labels <- c("Control - Chronic N", "Control - OakRecip", "Nitrogen ", "Control - SWaN", "Nitrogen/Invaded ", "Warm/Invaded ", "Control (GM)", "Invaded ", "Control (Warm PH/SWaN)", "Warm " )
+p <- ggplot(theTable, aes(x = Position)) + scale_x_discrete(limits = labels)
 
 ##### alpha ANOVA ####
 
@@ -80,7 +79,7 @@ p + geom_boxplot(data = p$data, aes(x=Grouped, y=value, color = NULL), alpha=0.0
 richness <- estimate_richness(physeq1)
 
 # #Analysis of Variance of shannon alpha diversity compared to variables
-anova.sh = aov(richness$Shannon ~ sample_data(physeq1)$Group)
+anova.sh = aov(richness$Shannon ~ sample_data(physeq1)$Treatment.Divided)
 summary(anova.sh)
 
 #Tukey Honest Significant Differences -- confidence intervals between differences of the means of factors
@@ -122,12 +121,6 @@ TukeyHSD(anova.sh)
 # 
 # write.csv(otuall.t, "otu_alpha_2.csv", row.names =TRUE)
 
-#adjusted p-vlaues w/ phyloseq
-#warm-control 0.9955429
-#invaded-control 0.7424470
-#nitrogen-control 0.4056320 
-#eradicated-control 0.1578449
-
 
 #### Chao Shannon ####
 library(iNEXT)
@@ -144,26 +137,6 @@ summary(Chao)
 #Tukey Honest Significant Differences -- confidence intervals between differences of the means of factors
 TukeyHSD(Chao)
 
-# p adj of observed 
-# eradicated-control 0.1291778
-# invaded-control  0.8187085
-# nitrogen-control  0.4776123
-# warm-control  0.9993261
-
-
-# p adj of estimate 
-# eradicated-control 0.1637234
-# invaded-control 0.8413963
-# nitrogen-control 0.4983061
-# warm-control 0.9973898
-
-#adjusted p-vlaues w/ phyloseq
-#eradicated-control 0.1578449
-#invaded-control 0.7424470
-#nitrogen-control 0.4056320 
-#warm-control 0.9955429
-
-
 
 ##### beta visualization ####
 
@@ -174,24 +147,18 @@ library(data.table)
 library(dplyr)
 library(tidyverse)
 
-
+## MDS ##
 t_otu <- t(otu_data)
 
 t_otu <- as.data.frame(t_otu)
 
 beta.data <- bray.part(t_otu)
 
-
 mds<- metaMDS(beta.data$bray)
 
 mds_data <- as.data.frame(mds$points)
 
-anova.sh = aov(mds ~ mds_data$Grouped)
-
-#write.csv(mds_data_2017, "2017_beta.csv")
-
-
-# stress = 0.1472309
+# stress =0.1451684
 
 
 mds_data$SampleID <- rownames(mds_data)
@@ -199,10 +166,19 @@ sam_data$SampleID <- rownames(sam_data)
 mds_data <- dplyr::left_join(mds_data, sam_data)
 
 
-cbbPalette <- c("#009E73", "#e79f00", "#0072B2", "#D55E00", "#CC79A7", "#9999CC")
+# create palette
+#install.packages("RColorBrewer")
+library(RColorBrewer)
+brewer.pal(10, "Spectral")
+library(randomcoloR)
+n <- 10
+palette <- distinctColorPalette(n)
+cbbPalette <- c("#9E0142", "#D53E4F" ,"#F46D43", "#FDAE61", "#FEE08B", "#E6F598" ,"#ABDDA4", "#66C2A5", "#3288BD", "#5E4FA2")
 
+
+#plot
 library(ggplot2)
-p <- ggplot(mds_data, aes(x = MDS1, y = MDS2, color = Grouped)) +
+p <- ggplot(mds_data, aes(x = MDS1, y = MDS2, color = Treatment.Divided )) +
   geom_point(size= 3)+
   stat_ellipse(size =.5) +
   theme(panel.grid = element_blank(),
@@ -212,14 +188,14 @@ p <- ggplot(mds_data, aes(x = MDS1, y = MDS2, color = Grouped)) +
         plot.caption = element_text(hjust = 0),
         axis.title.x = element_text(color="black", vjust=1),
         axis.title.y = element_text(color="black" , vjust=1))+
-  #scale_color_manual(values = cbbPalette) +
+  scale_color_manual(values = palette) +
   theme(strip.background = element_rect(colour="black", fill="white",
                                         size=0.5, linetype="solid"))
 
 
-
+#add plot labels
 p + labs(title = "",
-              caption = "Stress = 0.1472309; P-value = 6.49e-16")
+              caption = "")
 
 
 ##### permanova #####
@@ -227,14 +203,16 @@ p + labs(title = "",
 
 library(PERMANOVA)
 
+#change lables
 t_otu$SampleID <- rownames(t_otu)
 sam_data$SampleID <- rownames(sam_data)
 group_data <- dplyr::left_join(t_otu, sam_data)
 
-
+#make groupes
 groups <- factor(group_data$Grouped)
 groups
 
+#bray analysis
 bray <- DistContinuous(t_otu, coef="Bray_Curtis")
 
 permanova <- PERMANOVA(bray, groups, CoordPrinc = TRUE)
@@ -244,16 +222,18 @@ plot(permanova)
 summary(permanova)
 
 
-##### betadisper #####
+##### betadisper ##### 
 #https://cran.r-project.org/web/packages/hagis/vignettes/betadiversity.html
 
+#change labels
 t_otu$SampleID <- rownames(t_otu)
 sam_data$SampleID <- rownames(sam_data)
 group_data <- dplyr::left_join(t_otu, sam_data)
 
-
+# make gouping
 groups <- factor(group_data$Grouped)
 groups
+
 dis <- vegdist(t_otu, "bray", na.rm = TRUE)
 
 beta_dis <- betadisper(dis, group_data$Grouped)
@@ -267,13 +247,11 @@ beta_dis_TukeyHSD
 boxplot(beta_dis,ellipse = TRUE)
 
 
-
-
 ###### taxa visualization ######
 
 #https://rstudio-pubs-static.s3.amazonaws.com/403427_6537014d60e44e1b9d72514d5fb787b5.html
 
-# https://www.nicholas-ollberding.com/post/introduction-to-the-statistical-analysis-of-microbiome-data-in-r/
+#https://www.nicholas-ollberding.com/post/introduction-to-the-statistical-analysis-of-microbiome-data-in-r/
 
 plot_bar(physeq1, x="Grouped", fill="family") + theme(legend.position = "none")
 
