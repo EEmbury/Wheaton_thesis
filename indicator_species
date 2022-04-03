@@ -1,0 +1,322 @@
+rm(list = ls())
+## HF Data Analysis ##
+## jennie wuest
+## july 2, 2021
+
+##loading tidyverse, attaching packages
+library(tidyverse)
+######### setting working directory as folder w data
+# setwd("~/Desktop/Harvard_Fungi")
+# list.files()
+
+
+###########################################
+## ISA for sequence_dataset_synthesis ###
+## in THIS ORDER
+#install.packages("indicspecies")
+library(indicspecies)
+library(tidyverse)
+otu <- read.csv("normal_otu_meta_no_control singletreat.csv", header = FALSE)
+otu<- otu %>% remove_rownames %>% column_to_rownames(var="V1")
+t_otu <- t(otu)
+OTU <- as.data.frame(t_otu)
+rownames(OTU)<-NULL
+write.csv(OTU, "transpose_otu.csv")
+
+
+vsynth = read.csv("transpose_otu.csv") ## sample ID (rows), treatment (rows), OTUs (coloumns) 
+#vsynth = vsynth[-c(245:245),]
+View(vsynth)
+
+abun = vsynth[,7:ncol(vsynth)]
+View(abun)
+
+treatment = vsynth$Treatment.Divided
+
+visa = multipatt(abun, cluster = treatment, duleg = TRUE,func = "r.g", control = how(nperm = 9999))
+options(max.print=1000000)
+summary(visa)
+summary <- capture.output(summary(visa))
+
+write.csv(summary,"no_control_HF_grouped_indicator_species_singletreat.csv")
+## moving on to Cohen's d
+## calculated in Excel 
+
+
+#############################
+## visualizing cohens d
+
+######### installing and loading required packages 
+library(gplots)
+
+#install.packages("RColorBrewer", dependencies = TRUE)
+library(RColorBrewer)
+
+## reading in sequence_dataset_synthesis cohens_d
+## transforming into matrix
+sds_cohensd <- read.csv("cohen_single_treatment.csv", check.names = FALSE)
+view(sds_cohensd)
+library(dplyr)
+sds_cohensd <- sds_cohensd %>%
+  arrange(factor(sds_cohensd$X, levels = c("Invasion", "Warm", "Nitrogen")))
+view(sds_cohensd)
+sdsrnames <- sds_cohensd[,1]                            # assign labels in column 1 to "rnames"
+mat_sds_cohensd <- data.matrix(sds_cohensd[,2:ncol(sds_cohensd)])  # transform columna 2-all into a matrix
+rownames(mat_sds_cohensd) <- sdsrnames                  # assign row names
+
+##### customizing and plotting heat map#####
+my_palette <- colorRampPalette(c("#038900", "#D0CB3D", "#DE2E09"))(n = 299)
+
+
+col_breaks = c(seq(-1,-0.4,length=100), # for red
+               seq(-0.3,0.3,length=100),  # for yellow
+               seq(0.4,1,length=100)) # for green
+
+col_breaks = c(seq(-0.48,-0.07,length=100),  # for black
+               seq(-0.06,0.005,length=100),           # for purple
+               seq(0.007,1,length=100))             # for blue
+
+
+
+sds_heatmap <- heatmap.2(mat_sds_cohensd, 
+                     main = "Indicator Species Effect Size", # heat map title
+                     notecol="black",      # change font color of cell labels to black
+                     density.info="none",  # turns off density plot inside color legend
+                     cexRow =0.8,           #make order names smaller
+                     labCol = FALSE,
+                     trace="none",         # turns off trace lines inside the heat map
+                     margins =c(1,7),     # widens margins around plot
+                     breaks=col_breaks,  # enable color transition at specified limits
+                     dendrogram="none",     # only draw a row dendrogram
+                     Rowv="TRUE",
+                     Colv="FALSE",
+                     key=TRUE,
+                     col= my_palette,
+                     key.xlab = "Cohen's d",
+                     key.title= "Effect Size")
+          
+
+dev.off()
+
+                     #lmat = lmat,
+                 
+                     keysize=1,
+                     
+                     key.par=list(mar=c(3.5,7,2,9), cex=1.5, cex.lab=0.5, cex.axis=0.5))
+
+
+                     sepwidth=c(0.01,0.1),
+                     sepcolor="white",
+                     colsep=1:ncol(mat_sds_cohensd),
+                     rowsep=1:nrow(mat_sds_cohensd)) # turn off column clustering
+
+
+lwid = c(.3,5) # looks good
+ #if graph wonky
+
+#### ggplot attempt ####
+library(ggplot2)
+
+breaks = c(-1,-0.5,0,0.5, 1)
+
+labels = c("Nitrogen", "Invasion", "Warm")
+
+mat_sds_cohensd %>% 
+  as.data.frame() %>%
+  rownames_to_column("f_id") %>%
+  pivot_longer(-c(f_id), names_to = "samples", values_to = "Cohen's d")
+
+p <- mat_sds_cohensd %>% 
+  as.data.frame() %>%
+  rownames_to_column("f_id") %>%
+  pivot_longer(-c(f_id), names_to = "samples", values_to = "counts") %>%
+  ggplot(aes(x=samples, y=f_id, fill=counts)) + 
+  geom_raster() +
+  scale_fill_gradient2(limits=c(-1,1), low="#038900",  mid="#D0CB3D", high="red4", #colors in the scale
+                       midpoint=0, guide = "colorbar") + #same midpoint for plots (mean of the range)
+  guides(fill = guide_colourbar(title = "Cohen's d", barwidth = 1, barheight = 7))+
+  scale_y_discrete(limits = labels)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size=5.5),
+        axis.text.y = element_text(angle = 90, vjust = 1, hjust=.5, size=13),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(size = 17),
+        legend.position="right", legend.title = element_text(size = 11, vjust = 2))
+          
+p <- p + labs(title = "Indicator Species Effect Size in Nitrogen, Invasion, and Warm Treatments ",
+         subtitle = "Cohen's d Effect Size: Low = |0.2|, Medium = |0.5|, Large = |0.8|")
+
+
+library(svglite)
+
+#This actually save the plot in a image
+ggsave(file="final_indicator_species.svg", plot=p, width=14, height=8)
+
+#### reading in hemlock_otu_soils_tables cohens_d ####
+hem_cohensd <- read.csv("hemlock_cohensd.csv")
+view(hem_cohensd)
+hemrnames <- hem_cohensd[,1]                            # assign labels in column 1 to "rnames"
+mat_hem_cohensd <- data.matrix(hem_cohensd[,2:ncol(hem_cohensd)])  # transform columna 2-all into a matrix
+rownames(mat_hem_cohensd) <- hemrnames                  # assign row names
+
+## customizing and plotting heatmap
+my_palette <- colorRampPalette(c("#8b0000", "#f1ee27", "#24a558"))(n = 299)
+
+col_breaks = c(seq(-0.48,-0.07,length=100),  # for black
+               seq(-0.06,0.005,length=100),           # for purple
+               seq(0.007,1,length=100))             # for blue
+
+
+hem_heatmap <- heatmap.2(mat_hem_cohensd, 
+                         main = "", # heat map title
+                         notecol="black",      # change font color of cell labels to black
+                         density.info="none",  # turns off density plot inside color legend
+                         cexRow =0.8,           #make order names smaller
+                         cexCol =0.4,
+                         colsep=c(1:8),
+                         rowsep=(1:117),
+                         trace="none",         # turns off trace lines inside the heat map
+                         margins =c(3,5),     # widens margins around plot
+                         col=my_palette,       # use on color palette defined earlier
+                         breaks=col_breaks,    # enable color transition at specified limits
+                         dendrogram="none",     # only draw a row dendrogram
+                         Rowv="FALSE",
+                         Colv="FALSE")            # turn off column clustering
+
+
+
+###############################################
+############################ creating cladograms #######
+
+###taxa2dist
+###taxa2dist(x, varstep = FALSE, check = TRUE, labels)
+###Classification table with a row for each species or other basic taxon, and columns for identifiers of its classification at higher levels.
+citation("ggplot2")
+
+library(vegan)
+install.packages("factoextra")
+library(factoextra)
+install.packages("dendextend")
+library(dendextend)
+install.packages("ape")
+library(ape)
+library(tidyverse)
+library(ggrepel)
+library(ggplot2)
+install.packages("ggdendro")
+library(ggdendro)
+
+######## dendrogram for sequence_dataset_synthesis_v2018
+## read in taxa data for sequence_data_synthesis
+sds_taxa <- read.csv("sds_taxa.csv", header = T, sep = ",")
+View(sds_taxa)
+
+sdats_dis <- taxa2dist(sds_taxa, varstep = TRUE)
+sdats_dis
+
+plot(hclust(sdats_dis), hang = -1)
+
+
+######## dendrogram for hemlock_soils_otu_tables
+hem_taxa <- read.csv("hemlock_taxa.csv", header = T, sep = ",")
+hem_taxa
+
+hem_dis <- taxa2dist(hem_taxa, varstep = TRUE)
+hem_dis
+
+plot(hclust(hem_dis), hang = -1)
+
+citation("lme4")
+#########################################
+######### dendrograms for indicator species
+
+
+## loading in seq data synth indicator species taxa
+sds_isa <- read.csv("sds_isa_taxa.csv")
+view(sds_isa)
+
+sds_isa_dis <- taxa2dist(sds_isa, varstep = TRUE)
+view(sds_isa_dis)
+
+plot(hclust(sds_isa_dis), hang = -1, cex = 0.2)
+
+
+## loading in hem soils indicator species taxa
+hem_isa <- read.csv("hem_isa_taxa.csv")
+view(hem_isa)
+
+hem_isa_dis <- taxa2dist(hem_isa, varstep = TRUE)
+view(hem_isa_dis)
+
+plot(hclust(hem_isa_dis), labels = NULL, hang = -1, cex = 0.6)
+
+
+#############################################
+########### heatmaps for indicator species #####
+
+
+### heatmap for hemlock otu soils tables cohens d of indicator species
+hem_isa_cohensd <- read.csv("hem_isa_cohens_d.csv")
+view(hem_isa_cohensd)
+hem_isa_cd_rnames <- hem_isa_cohensd[,1]                            # assign labels in column 1 to "rnames"
+mat_hem_isa_cohensd <- data.matrix(hem_isa_cohensd[,2:ncol(hem_isa_cohensd)])  # transform columna 2-all into a matrix
+rownames(mat_hem_isa_cohensd) <- hem_isa_cd_rnames                  # assign row names
+
+my_palette <- colorRampPalette(c("#8b0000", "#f1ee27", "#24a558"))(n = 299)
+
+
+col_breaks = c(seq(-0.48,-0.07,length=100),  # for black
+               seq(-0.06,0.005,length=100),  # for purple
+               seq(0.007,1,length=100))      # for blue
+
+
+hem_isa_heatmap <- heatmap.2(mat_hem_isa_cohensd, 
+                         main = "", # heat map title
+                         notecol="black",      # change font color of cell labels to black
+                         density.info="none",  # turns off density plot inside color legend
+                         cexRow =0.8,           #make order names smaller
+                         cexCol =0.4,
+                         colsep=c(1:8),
+                         rowsep=(1:117),
+                         trace="none",         # turns off trace lines inside the heat map
+                         col=my_palette,       # use on color palette defined earlier
+                         breaks=col_breaks,    # enable color transition at specified limits
+                         dendrogram="none",     # only draw a row dendrogram
+                         Rowv="FALSE",
+                         Colv="FALSE")            # turn off column clustering
+
+### heatmap for sequence data synthesis cohens d of indicator species
+sds_isa_cohensd <- read.csv("sds_isa_cohens_d.csv")
+sds_isa_cohensd = sds_isa_cohensd[-c(7:11),]
+sds_isa_cohensd <- sds_isa_cohensd %>%
+  arrange(factor(sds_isa_cohensd$X, levels = c("N150","N50","N50_invaded","invaded","heated_invaded","heated")))
+view(sds_isa_cohensd)
+
+sds_isa_cd_rnames <- sds_isa_cohensd[,1]                            # assign labels in column 1 to "rnames"
+mat_sds_isa_cohensd <- data.matrix(sds_isa_cohensd[,2:ncol(sds_isa_cohensd)])  # transform columna 2-all into a matrix
+rownames(mat_sds_isa_cohensd) <- sds_isa_cd_rnames                  # assign row names
+
+my_palette <- colorRampPalette(c("#8b0000", "#f1ee27", "#24a558"))(n = 299)
+
+col_breaks = c(seq(-0.48,-0.07,length=100),  # for black
+               seq(-0.06,0.005,length=100),  # for purple
+               seq(0.007,1,length=100))      # for blue
+
+dev.off()            ## was calling error: "invalid graphics state", this fixed it
+
+sds_isa_heatmap <- heatmap.2(mat_sds_isa_cohensd, 
+                         main = "", # heat map title
+                         notecol="black",      # change font color of cell labels to black
+                         density.info="none",  # turns off density plot inside color legend
+                         cexRow =0.8,           #make order names smaller
+                         cexCol =0.2,
+                         colsep=c(1:8),
+                         rowsep=(1:117),
+                         trace="none",
+                         margins = c(3,5), # turns off trace lines inside the heat map
+                         col=my_palette,       # use on color palette defined earlier
+                         breaks=col_breaks,    # enable color transition at specified limits
+                         dendrogram="none",     # only draw a row dendrogram
+                         Rowv="FALSE",
+                         Colv="FALSE")            # turn off column clustering
+
