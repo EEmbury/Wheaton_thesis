@@ -1,0 +1,187 @@
+#Code from Dr.Romero Olivares
+
+#mixed model ANOVA 
+#one random effect = year 
+#one fixed effect = treatment 
+
+if(!require(psych)){install.packages("psych")}
+if(!require(lme4)){install.packages("lme4")}
+if(!require(lmerTest)){install.packages("lmerTest")}
+if(!require(multcompView)){install.packages("multcompView")}
+if(!require(lsmeans)){install.packages("lsmeans")}
+if(!require(nlme)){install.packages("nlme")}
+if(!require(car)){install.packages("car")}
+if(!require(rcompanion)){install.packages("rcompanion")}
+
+#see funguild r script to obtain data
+#funguild.data <- read.csv("funguild.data.csv", header=TRUE)
+Data = funguild.data
+
+
+###  Order factors by the order in data frame
+###  Otherwise, R will alphabetize them
+
+Data$study.divid = factor(Data$study.divid,
+                   levels=unique(Data$study.divid))
+
+Data$Trophic.Mode= factor(Data$Trophic.Mode,
+                              levels=unique(Data$Trophic.Mode))
+
+###  Check the data frame
+
+library(psych)
+headTail(Data)
+str(Data)
+summary(Data)   
+
+### Remove unnecessary objects
+
+rm(Input)
+
+#In this first example, the model will be specified with the lmer function 
+#in the package lme4.  The term (1|Town) in the model formula indicates that 
+#Town should be treated as a random variable, with each level having its own 
+#in the model.  The anova function in the package lmerTest is used to 
+#produce p-values for the fixed effects.  The rand function in the package 
+#lmerTest produces p-values for the random effects. 
+
+library(lme4)
+library(lmerTest)
+
+##attempt #1 ## doesnt work with this data?
+model = lmer(Abundance ~ Data$Trophic.Mode*Data$study.divid + (1|Data$Site.1),
+             data=Data,
+             REML=FALSE)
+print(summary(model), correlation=TRUE)
+
+###attempt #2
+library(nlme)
+model2 = lme(Abundance ~ Trophic.Mode*KindOfGrouped, data = Data,
+             random=~1|Site.1)
+summary(model2)
+anova(model2)
+random.effects.lme(model2)
+
+### attempt #3 from Adriana
+log <- log(Data$Abundance)
+log[which(!is.finite(log))] <- 0
+log <- as.data.frame(log)
+
+df_new <- cbind(log,Data)
+
+
+rankdata <- as.data.frame(rank(Data$Abundance))
+df_rank <- cbind(rankdata,Data)
+
+rankalpha <- as.data.frame(rank(Data$alpha))
+df_rank_alpha <- cbind(rankalpha,Data)
+
+
+model = lmer(rank(Data$Abundance) ~ study.divid + (1|Site.1),
+             data=df_rank_alpha)
+anova(model)
+summary(model)
+rand(model)
+
+
+model = lmer(rank(Data$alpha) ~ KindOfGrouped + (1|Site.1),
+             data=df_rank)
+
+residual <- residuals(model)
+
+
+library("numDeriv")
+library("RCurl") ## to source() from Github
+library("ggplot2"); theme_set(theme_bw())
+library("reshape2")
+library("plyr")
+library("RColorBrewer")
+
+############################
+
+
+anova(model) #anova function in the package lmerTest is used to produce p-values for the fixed effects
+rand(model) #rand function in the package lmerTest produces p-values for the random effects
+
+#posthoc analysis 
+
+library(multcomp)
+library(lsmeans)
+library(nlme)
+
+
+marginal = lsmeans(model, ~ KindOfGrouped)
+
+citation("emmeans")
+
+library(emmeans)
+tukey <- emmeans(model, list(pairwise ~ KindOfGrouped), adjust = "tukey")
+
+CLD = cld(marginal,
+          alpha=0.05, 
+          Letters=letters,        ### Use lower-case letters for .group
+          adjust="tukey")         ###  Tukey-adjusted comparisons
+
+CLD
+
+pairs(marginal,
+      adjust="tukey")
+
+### capture output
+
+options(max.print = 1000000)
+
+tukey <- capture.output(emmeans(model, list(pairwise ~ Trophic.Mode*KindOfGrouped), adjust = "tukey"))
+
+tukey<- as.data.frame(tukey)
+
+write.csv(tukey, "trophic_mixed_effects.csv")
+
+
+#######youtube tutorial --- ALPHA ###### https://www.youtube.com/watch?v=VhMWPkTbXoY #######
+library(nlme)
+Data = data
+
+model2 = lme(rank(Data$alpha) ~ study.divid, data = df_rank_alpha,
+             random=~1|Site.1)
+summary(model2)   
+
+
+model = glmer(alpha ~ KindOfGrouped + (1|Site.1), 
+             data=Data)
+
+######## check residuals for normality #####
+
+library("dplyr")
+library("ggpubr")
+
+#install.packages("nortest")
+library(nortest)
+
+#normality--- P should be greater than 5, means not significant difference from normal
+
+model2 = lme(Abundance ~ Trophic.Mode*KindOfGrouped, data = Data,
+             random=~1|Site.1)
+
+nortest::ad.test(resid(model))
+nortest::cvm.test(resid(model))
+nortest::lillie.test(resid(model))
+
+plot(resid(model, type = "pearson") ~ fitted(model))
+qqnorm(resid(model, type = "pearson"))
+qqline(resid(model, type = "pearson"))
+
+
+
+
+install.packages("ARTool")
+library(ARTool)
+
+
+m = art(Abundance ~ Trophic.Mode * KindOfGrouped + (1|Site.1), data=Data)
+summary(m)
+anova(m)
+
+
+
+
