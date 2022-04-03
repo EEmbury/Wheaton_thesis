@@ -1,10 +1,10 @@
 rm(list = ls())
-
-# source code: https://natpombubpa-lab.github.io/resources/FunGuild_plot
-
-
-#Code for Rscript
-#Load R libraries
+# 
+# # source code: https://natpombubpa-lab.github.io/resources/FunGuild_plot
+# 
+# 
+# #Code for Rscript
+# #Load R libraries
 library(ape)
 library(vegan)
 library(dplyr)
@@ -13,55 +13,112 @@ library(ggplot2)
 library(tidyverse)
 library(ggsignif)
 library(ggpubr)
-
+library(agricolae)
+library(rstatix)
+library(microbiome)
+library(metagMisc)
 
 #Load mapping file into R
-meta <- read.csv("Finalized_Metadata.csv", header=TRUE)
+meta <- read.csv("MetaData_onlyHF_singletreat.csv", header=TRUE)
 sampleData <- sample_data(meta)
 
-sampleData <- sampleData %>% remove_rownames %>% column_to_rownames(var="Label")
+sampleData <- sampleData %>% remove_rownames %>% column_to_rownames(var="Site")
 
 #Load reformatted FUNGuild data into R
-FG <- read.csv("funguild_cleaned_test.CSV",header=T)
+FG <- read.csv("normal_otu_onlyHF_taxa.guilds_onlysappathsymb.csv",header=T)
 
-FG$OTU.ID <- sub(FG$OTU.ID, 
-                      pattern = "OTU", replacement = "")
-
-FG <- FG %>% remove_rownames %>% column_to_rownames(var="OTU.ID")
+FG <- FG %>% remove_rownames %>% column_to_rownames(var="OTU_ID")
 
 #Select only the column that we need
-FGotus <- select(FG, -(taxonomy:Citation.Source))
+FGotus <- select(FG, -(Taxonomy:Citation.Source))
 FGotumat <- as(as.matrix(FGotus), "matrix")
 FGOTU <- otu_table(FGotumat, taxa_are_rows = TRUE)
-FGtaxmat <- select(FG, Confidence.Ranking, Trophic.Mode, class, order, family)
+FGtaxmat <- select(FG, Trophic.Mode)
 FGtaxmat <- as(as.matrix(FGtaxmat),"matrix")
 FGTAX = tax_table(FGtaxmat)
 
 #Creating phyloseq object
 physeq = phyloseq(FGOTU,FGTAX,sampleData)
-physeq.prune = prune_taxa(taxa_sums(physeq) > 1, physeq)
-physeq.prune.nopossible = subset_taxa(physeq.prune, Confidence.Ranking="Highly Possible")
-physeq.prune.nopossible = subset_taxa(physeq.prune.nopossible, Confidence.Ranking!="-")
-rel_abund = physeq.prune.nopossible %>%  transform_sample_counts(function(x) {x/sum(x)}) %>% psmelt()
+#physeq.prune = prune_taxa(taxa_sums(physeq) > 1, physeq)
+#physeq.prune.nopossible = subset_taxa(physeq.prune, Confidence.Ranking= c("Highly Probable", "Probable"))
+#physeq.prune.nopossible = subset_taxa(physeq.prune.nopossible, Confidence.Ranking!="-")
+#total_samples <- phyloseq::nsamples(physeq)
+#pseq.or <- aggregate_rare(physeq, level="Trophic.Mode", detection = 30, prevalence = 10/total_samples)
+#rel_abund = physeq %>% transform_sample_counts(function(x) {x/sum(x)}) %>% psmelt()
+funguild.data <- psmelt(physeq)
+
+#fungild.data <- read.csv("funguild.data.csv")
+
+#write.csv(funguild.data, "funguild.data.csv")
+
+labels.site.treat <- c("Control Barre Woods", "Warm Barre Woods", "Control Chronic N Amendment ", "Nitrogen Chronic N Amendment ", "Control Harvard Forest", 
+            "Invaded Harvard Forest", "Control SWaN", "Invaded SWaN", "Nitrogen SWaN", "Nitrogen Invaded SWaN", "Warm SWaN", "Warm Invaded SWaN", 
+            "Control SWaN and PH", "Warm SWaN and PH")
+
+labels.Treatment.Divided <- c("Control - Chronic N", "Control - OakRecip","Nitrogen ","Control - SWaN", "Nitrogen/Invaded ", "Warm/Invaded ", 
+                              "Warm ", "Invaded ", "Control (GM)", "Control (Warm Barre)", "Control (Warm PH/SWaN)")  
+
+labels.KindOfDivided <- c("Control Nitrogen", "Nitrogen", "Control Invasion", "Invasion", "Control Warm", "Warm", "Control SWaN",
+                          "Invasion - SWaN", "Nitrogen - SWaN", "Nitrogen/Invasion - SWaN", "Warm - SWaN", "Warm/Invaded - SWaN")
+
+labels.study.divid <- c("Control Warm Study #1", "Warm Study #1", "Control Warm Study #2", 
+                        "Warm Study #2", "Control Warm Study #3", "Warm Study #3", "Control Invaded Study #1",
+                        "Invaded Study #1", "Control Invaded Study #2", "Invaded Study #2", "Control Invaded Study #3", "Invaded Study #3",
+                        "Control N Study #1", "Nitrogen Study #1","Control N Study #2", "Nitrogen Study #2", "Control N Study #3", "Nitrogen Study #3")
+
+# error bar attempt
+library(Rmisc)
+
+tgc <- summarySE(funguild.data, measurevar="Abundance", groupvars=c("Trophic.Mode","study.divid"))
+
+tgc$ymax <- (tgc$Abundance + tgc$se)
+
+tgc$ymin <- (tgc$Abundance - tgc$se)
+
+
+#Plot
+FUNGuildcom = ggplot(data = tgc, mapping = aes_string(x = "study.divid",  y = "Abundance", fill = "Trophic.Mode"))+
+  scale_x_discrete(limits = labels.study.divid) +
+  geom_bar(stat="identity", position = "dodge", width = 0.5) + ggtitle("Trophic Mode Distribution in Warm, Invasion, and Nitrogen Treatments")+
+  geom_errorbar(aes(ymin=Abundance-se, ymax=Abundance+se), width=.3, position=position_dodge(.5))+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        plot.title = element_text(size = 17, face = "bold", hjust =0.5)) +
+  xlab("Treatment") +
+  ylab("Relative Abundance")+
+  scale_fill_manual(values = cbbPalette, name = "Trophic Mode")
+
+FUNGuildcom
+
+plot <- FUNGuildcom + geom_vline(xintercept = 2.5, alpha = 0.3) + geom_vline(xintercept = 4.5, alpha = 0.3) + 
+  geom_vline(xintercept = 6.5, size = 1) +   geom_vline(xintercept = 8.5, alpha = 0.3)+
+  geom_vline(xintercept = 10.5, alpha = 0.3) +   geom_vline(xintercept = 12.5, size = 1)+
+  geom_vline(xintercept = 14.5, alpha = 0.3)+   geom_vline(xintercept = 16.5, alpha = 0.3)
+
+
+plot  
+
+cbbPalette <- c("cornflowerblue", "goldenrod1", "lightcoral")
+
+  
+
+library(svglite)
+
+#This actually save the plot in a image
+ggsave(file="final.trophic.svg", plot=plot, width=14, height=8)
+
 
 #Create color palette
-
 #install.packages("randomcoloR")
 library(randomcoloR)
-n <- 19
+n <- 46
 palette <- distinctColorPalette(n)
-
 
 cbbPalette <-  grDevices::colors()[grep('gr(a|e)y', grDevices::colors(), invert = T)]
 
 library(RColorBrewer)
 brewer.pal(12, "Set3")
 
-
-
-
 #psF = filter_taxa(physeq.prune.nopossible, function(x) sum(x>2) > (0.15*length(x)), TRUE)
-
 
 #rel.abund = transform_sample_counts(physeq.prune.nopossible, (function(x) x/sum(x)))
 
@@ -70,57 +127,16 @@ brewer.pal(12, "Set3")
 psmelt2 = psmelt(physeq.prune.nopossible)
 
 
-############# saprotroph ###
-FUNGuildcom = ggplot(data = rel_abund, mapping = aes_string(x = "Grouped",  y = "Abundance", fill = "Trophic.Mode"))+
-              geom_bar(stat="identity", position = "dodge", width = 0.5) + ggtitle("Trophic Mode Relative Abundance")+
-              theme(axis.text.x = element_text(angle = 90))
-              
-  
-  stat_compare_means(method = "kruskal.test",
-                                  label.y =1)
-
-theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-  stat_compare_means(label = "p.signif", method = "wilcox.test",
-                     ref.group = "control")
-              #+ scale_fill_manual(values = palette)
-
-FUNGuildcom 
-
-label.y = c(420010, 450000, 150000, 53000, 35000, 10100)
-
-############ pathotroph ###
-
-FUNGuildcom = ggplot(data = psmelt2, mapping = aes_string(x = "Grouped",  y = "Abundance"))+
-  geom_bar(stat="identity") + ggtitle("Pathotroph Relative Abundance")+
-  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-  stat_compare_means(label = "p.signif", method = "wilcox.test",
-                     ref.group = "control", label.y = c(420010, 450000, 150000, 60000, 35000, 10100))+ 
-  stat_compare_means(method = "kruskal.test",
-                     label.y = 480000)
-#+ scale_fill_manual(values = palette)
-
-FUNGuildcom 
-
-#################### Symbiotroh ###
-FUNGuildcom = ggplot(data = psmelt2, mapping = aes_string(x = "Grouped",  y = "Abundance"))+
-  geom_bar(stat="identity") + ggtitle("Symbiotroph Relative Abundance")+
-  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-  stat_compare_means(label = "p.signif", method = "wilcox.test",
-                     ref.group = "control", label.y = c(1000010, 800000, 270000, 37000, 65000, 10100))+ 
-  stat_compare_means(method = "kruskal.test",
-                     label.y = 1060000)
-#+ scale_fill_manual(values = palette)
-
-FUNGuildcom 
-
-
 #### ANOVA #####
-aov <- aov(Abundance ~ Grouped , data = psmelt)
+aov <- aov(Abundance ~ Trophic.Mode * KindOfGrouped, data = funguild.data )
 summary(aov)
+
 
 TukeyHSD <- TukeyHSD(aov)
 TukeyHSD
 
-write.csv(TukeyHSD$`Grouped:order`, "Tukey.csv")
+Tukey <- as.data.frame(TukeyHSD$`Trophic.Mode:KindOfGrouped`)
+
+write.csv(Tukey,"trophic.hf.only.tukey.csv")
 
 options(max.print=100000)
