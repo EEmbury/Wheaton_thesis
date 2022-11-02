@@ -8,6 +8,7 @@
 ##from funguild github website (https://github.com/UMNFuN/FUNGuild) make a copy of the guilds python file and save it as guilds.py (use notepad++) in the directory you will be using 
 ##from fuinguild github website make a copy of the example OTU table and save as OTU_example.txt (also in notepad++) it in the directory you will be using 
 ##type python guilds.py -otu OTU_example.txt -db fungi -m -u 
+    ### guilds.py is in this GitHub directory
 ## if you get a module error that says: no module named "requests"
 ##then type pip install requests - this should automatically install the requests package 
 ##once installed, go ahead and type the script again python guilds.py -otu OTU_example.txt -db fungi -m -u 
