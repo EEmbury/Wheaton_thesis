@@ -1,0 +1,49 @@
+##for this to work, you have to have an active internet connection 
+##open cmd on windows 
+##type python
+##install python 
+##after downloading if you see this >>> it means you're inside python and you need to exit 
+##to exit type ctrl-z and return 
+##once your back on windows cmd you should see C: and your address
+##from funguild github website (https://github.com/UMNFuN/FUNGuild) make a copy of the guilds python file and save it as guilds.py (use notepad++) in the directory you will be using 
+##from fuinguild github website make a copy of the example OTU table and save as OTU_example.txt (also in notepad++) it in the directory you will be using 
+##type python guilds.py -otu OTU_example.txt -db fungi -m -u 
+## if you get a module error that says: no module named "requests"
+##then type pip install requests - this should automatically install the requests package 
+##once installed, go ahead and type the script again python guilds.py -otu OTU_example.txt -db fungi -m -u 
+##you'll get three files: one with all the info, one with only matched hits, and one with unmatched hits
+##you're done 
+
+
+Example: 
+
+C:\Users\Adri\Desktop>python guilds.py -otu OTU_example.txt -db fungi -m -u
+FunGuild v1.1 Beta
+Connecting with FUNGuild database ...
+
+Reading in the OTU table: 'OTU_example.txt'
+
+Searching the FUNGuild database...
+10%
+20%
+30%
+40%
+50%
+60%
+70%
+80%
+90%
+100%
+
+Found 12 matching taxonomy records in the database.
+Dereplicating and sorting the result...
+FunGuild tried to assign function to 10 OTUs in 'OTU_example.txt'.
+FUNGuild made assignments on 6 OTUs.
+Result saved to 'OTU_example.guilds.txt'
+
+Additional output:
+FUNGuild made assignments on 6 OTUs, these have been saved to OTU_example.guilds_matched.txt.
+4 OTUs were unassigned, these are saved to OTU_example.guilds_unmatched.txt.
+
+Total calculating time: 1.98 seconds.
+
