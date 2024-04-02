@@ -45,10 +45,8 @@ for (q in 1:314) {
   typeof(estimate_d_values[q, 2])
   rare <- rrarefy(t_val, sample = (estimate_d_values[q, 2]))
   t_rare <- t(rare)
-  fart <- as.data.frame(t_rare)
-  #write.csv(fart, "rare_otu.csv", append = TRUE, col.names = table_val, row.names = otu_data$OUT.ID)
-  #vectooor <- append(vectooor, fart)
-  vectooor[q] <- fart
+  art <- as.data.frame(t_rare)
+  vectooor[q] <- art
   }
 
 vectar <- as.data.frame(vectooor)
